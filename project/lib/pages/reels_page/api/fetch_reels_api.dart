@@ -15,25 +15,25 @@ class FetchReelsApi {
 
     Utils.showLog("Get Reels Pagination Page => $startPagination");
 
-    final uri = Uri.parse("${Api.fetchReels}?start=$startPagination&limit=$limitPagination&userId=$loginUserId&videoId=$videoId");
+    String url = "${Api.fetchReels}?start=$startPagination&limit=$limitPagination&userId=$loginUserId";
+    if (videoId.isNotEmpty) {
+      url += "&videoId=$videoId";
+    }
+    final uri = Uri.parse(url);
     Utils.showLog("Get Reels Api Url => $uri");
 
     final headers = {"key": Api.secretKey};
 
     try {
-      var response = await http.get(uri, headers: headers);
+      var response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         Utils.showLog("Get Reels Api Response => ${response.body}");
 
-        // Check if the response is a Map or a List at the top level.
         if (jsonResponse is Map<String, dynamic>) {
-          // If it's a map, proceed with the normal parsing.
           return FetchReelsModel.fromJson(jsonResponse);
         } else if (jsonResponse is List<dynamic>) {
-          // If it's a list, manually create the model and parse the data.
-          // This is the most likely scenario given your error.
           final List<Data> reelsData = jsonResponse.map((json) => Data.fromJson(json)).toList();
           return FetchReelsModel(
             status: true,
@@ -41,7 +41,6 @@ class FetchReelsApi {
             data: reelsData,
           );
         } else {
-          // Handle unexpected response types
           Utils.showLog("Get Reels Api Error: Unexpected JSON response type");
         }
       } else {
