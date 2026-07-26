@@ -40,7 +40,7 @@ class BottomBarController extends GetxController {
   }
 
   List bottomBarPages = [
-    const ReelsViewIOS(),
+    ReelsViewIOS(),
     const StreamView(),
     const FeedView(),
     const MessageView(),
