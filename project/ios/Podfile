@@ -33,14 +33,7 @@ target 'Runner' do
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
-  # ✅ AGGRESSIVE VERSION FORCING (Fix for Bitrise)
-  # These must match your local Podfile.lock EXACTLY to prevent conflicts on Bitrise
-  pod 'Firebase', '11.4.0'
-  pod 'Firebase/Auth', '11.4.0'
-  pod 'Firebase/Messaging', '11.4.0'
-  pod 'Firebase/Core', '11.4.0'
-  pod 'Firebase/Crashlytics', '11.4.0'
-  pod 'FirebaseCore', '11.4.0'
+  # ✅ ENSURE FIXED NATIVE SDKs (Fix for Bitrise)
   pod 'GoogleSignIn', '7.1.0'
   pod 'BranchSDK', '3.3.0'
 
@@ -54,7 +47,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
-    # Ensure deployment target is consistent
+    # Force all components to respect the iOS 14.0 target
     target.build_configurations.each do |config|
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
