@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-import 'package:preload_page_view/preload_page_view.dart';
 import 'package:quick_actions/quick_actions.dart';
 import 'package:auralive/google_ad/google_ad_services.dart';
 import 'package:auralive/pages/reels_page/api/fetch_reels_api.dart';
@@ -13,8 +12,6 @@ import 'package:auralive/pages/splash_screen_page/api/create_report_api.dart';
 import '../../bottom_bar_page/controller/bottom_bar_controller.dart';
 
 class ReelsController extends GetxController {
-  PreloadPageController preloadPageController = PreloadPageController();
-
   bool isLoadingReels = false;
   FetchReelsModel? fetchReelsModel;
 
