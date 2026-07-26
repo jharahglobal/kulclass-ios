@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:auralive/custom/custom_format_number.dart';
 import 'package:auralive/main.dart';
 import 'package:auralive/pages/preview_user_profile_page/controller/preview_user_profile_controller.dart';
@@ -9,13 +13,13 @@ import 'package:auralive/ui/no_data_found_ui.dart';
 import 'package:auralive/ui/preview_image_ui.dart';
 import 'package:auralive/ui/preview_network_image_ui.dart';
 import 'package:auralive/ui/report_bottom_sheet_ui.dart';
-import 'package:auralive/utils/api.dart';
 import 'package:auralive/utils/asset.dart';
 import 'package:auralive/utils/color.dart';
 import 'package:auralive/utils/enums.dart';
-import 'package:auralive/utils/font_style.dart'; 
-import 'package:auralive/widgets/gift_media_widget.dart'; 
-
+import 'package:auralive/utils/font_style.dart';
+import 'package:auralive/utils/utils.dart';
+import 'package:flutter_svga/flutter_svga.dart';
+import 'package:auralive/custom/svga_simple_image.dart';
 
 class PreviewUserProfileAppBar extends StatelessWidget implements PreferredSizeWidget {
   const PreviewUserProfileAppBar({super.key});
@@ -62,17 +66,16 @@ class PreviewUserProfileAppBar extends StatelessWidget implements PreferredSizeW
                 GetBuilder<PreviewUserProfileController>(
                   builder: (controller) => GestureDetector(
                     onTap: () {
-                  ReportBottomSheetUi.show(
-                    context: context,
-                    onReport: (reason) {
-                      // ✅ Call Controller to Report User & Exit Page
-                      controller.onReportUser(
-                        userId: controller.userId,
-                        reason: reason,
+                      ReportBottomSheetUi.show(
+                        context: context,
+                        onReport: (reason) {
+                          controller.onReportUser(
+                            userId: controller.userId,
+                            reason: reason,
+                          );
+                        },
                       );
                     },
-                  );
-                },
                     child: Container(
                       height: 35,
                       width: 35,
@@ -82,9 +85,7 @@ class PreviewUserProfileAppBar extends StatelessWidget implements PreferredSizeW
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColor.colorTextGrey.withOpacity(0.8)),
                       ),
-                      child: Center(
-                          child:
-                              Image.asset(AppAsset.icMore, color: AppColor.colorTextGrey.withOpacity(0.8), width: 22)),
+                      child: Center(child: Image.asset(AppAsset.icMore, color: AppColor.colorTextGrey.withOpacity(0.8), width: 22)),
                     ),
                   ),
                 ),
@@ -97,127 +98,73 @@ class PreviewUserProfileAppBar extends StatelessWidget implements PreferredSizeW
   }
 }
 
-class ReelsTabView extends StatelessWidget {
+class ReelsTabView extends StatefulWidget {
   const ReelsTabView({super.key});
 
   @override
+  State<ReelsTabView> createState() => _ReelsTabViewState();
+}
+
+class _ReelsTabViewState extends State<ReelsTabView> {
+  final controller = Get.find<PreviewUserProfileController>();
+  WebViewController? webViewController;
+  bool isPageLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    initializeWebView();
+  }
+
+  Future<void> initializeWebView() async {
+    try {
+      final storage = GetStorage();
+      final userEmail = storage.read('user_email') ?? '';
+      final webUserId = controller.userId; // The profile owner's ID
+      final webName = controller.fetchProfileModel?.userProfileData?.user?.name ?? '';
+
+      final url = "https://kulclass.com/profile_reels.php?email=$userEmail&uid=$webUserId&name=$webName";
+      Utils.showLog("🎯 Loading User Profile Reels WebView (iOS): $url");
+
+      late final PlatformWebViewControllerCreationParams params;
+      if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+        params = WebKitWebViewControllerCreationParams(
+          allowsInlineMediaPlayback: true,
+        );
+      } else {
+        params = const PlatformWebViewControllerCreationParams();
+      }
+
+      webViewController = WebViewController.fromPlatformCreationParams(params)
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(Colors.white)
+        ..setUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1")
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) {
+              if (mounted) setState(() => isPageLoading = false);
+            },
+          ),
+        )
+        ..loadRequest(Uri.parse(url));
+
+      if (webViewController!.platform is AndroidWebViewController) {
+        (webViewController!.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
+      }
+    } catch (e) {
+      Utils.showLog("User Profile Reels WebView Initialization Failed: $e");
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GetBuilder<PreviewUserProfileController>(
-      id: "onGetVideo",
-      builder: (controller) => controller.isLoadingVideo
-          ? GridViewShimmerUi()
-          : controller.videoCollection.isEmpty
-              ? Center(
-                  child: SingleChildScrollView(
-                    child: const NoDataFoundUi(
-                      iconSize: 140,
-                      fontSize: 16,
-                    ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: GridView.builder(
-                    shrinkWrap: true,
-                    itemCount: controller.videoCollection.length,
-                    padding: const EdgeInsets.all(10),
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemBuilder: (context, index) {
-                      return Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              if (!(controller.videoCollection[index].isBanned ?? false)) {
-                                controller.onClickReels(index);
-                              }
-                            },
-                            child: Container(
-                              clipBehavior: Clip.antiAlias,
-                              decoration: BoxDecoration(
-                                color: AppColor.colorTextGrey.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: AspectRatio(
-                                aspectRatio: 0.75,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    Image.asset(AppAsset.icImagePlaceHolder, width: 70),
-                                    AspectRatio(
-                                      aspectRatio: 0.75,
-                                      child: PreviewNetworkImageUi(image: controller.videoCollection[index].videoImage),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Visibility(
-                            visible: (controller.videoCollection[index].isBanned ?? false),
-                            child: Container(
-                              height: Get.height,
-                              alignment: Alignment.topRight,
-                              decoration: BoxDecoration(
-                                color: AppColor.black.withOpacity(0.65),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Image.asset(AppAsset.icNone, color: AppColor.colorRedContainer, width: 20),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            height: 35,
-                            decoration: BoxDecoration(
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(14),
-                                bottomRight: Radius.circular(14),
-                              ),
-                              gradient: LinearGradient(
-                                colors: [AppColor.transparent, AppColor.black.withOpacity(0.6)],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                mainAxisAlignment: MainAxisAlignment.start,
-                                children: [
-                                  Image.asset(
-                                    AppAsset.icLike,
-                                    width: 18,
-                                    color: (controller.videoCollection[index].isLike ?? false)
-                                        ? AppColor.colorTextRed
-                                        : AppColor.white,
-                                  ),
-                                  Text(
-                                    " ${CustomFormatNumber.convert(controller.videoCollection[index].totalLikes ?? 0)}",
-                                    style: AppFontStyle.styleW600(AppColor.white, 11),
-                                  ),
-                                  8.width,
-                                  Image.asset(AppAsset.icComment, width: 18),
-                                  Text(
-                                    " ${CustomFormatNumber.convert(controller.videoCollection[index].totalComments ?? 0)}",
-                                    style: AppFontStyle.styleW600(AppColor.white, 11),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        ],
-                      );
-                    },
-                  ),
-                ),
+    return Stack(
+      children: [
+        if (webViewController != null)
+          WebViewWidget(controller: webViewController!),
+        if (isPageLoading)
+          const Center(child: CircularProgressIndicator(color: AppColor.primary)),
+      ],
     );
   }
 }
@@ -351,16 +298,15 @@ class CollectionsTabView extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
                           5.height,
-                          controller.giftCollection[index].giftType == 1 ||
-                                  controller.giftCollection[index].giftType == 2
+                          controller.giftCollection[index].giftType == 1 || controller.giftCollection[index].giftType == 2
                               ? Expanded(
                                   child: PreviewNetworkImageUi(image: controller.giftCollection[index].giftImage ?? ""),
                                 )
                               : controller.giftCollection[index].giftType == 3
                                   ? Expanded(
                                       child: SizedBox(
-                                    child: GiftMediaWidget(
-                                      url: Api.baseUrl + (Api.baseUrl + (controller.giftCollection[index].giftImage ?? ""))),
+                                        width: Get.width,
+                                        child: SVGAImageWrapper(resUrl: controller.giftCollection[index].giftImage ?? ""),
                                       ),
                                     )
                                   : Offstage(),
@@ -399,23 +345,3 @@ class CollectionsTabView extends StatelessWidget {
     );
   }
 }
-
-//   GestureDetector(
-//   onTap: () => PreviewImagesDialogUi.show(images: controller.postCollection[index].postImage ?? []),
-//   child: Container(
-//     color: AppColor.colorTextGrey.withOpacity(0.1),
-//     child: AspectRatio(
-//       aspectRatio: 0.88,
-//       child: Stack(
-//         alignment: Alignment.center,
-//         children: [
-//           Image.asset(AppAsset.icImagePlaceHolder, width: 70),
-//           AspectRatio(
-//             aspectRatio: 0.88,
-//             child: PreviewNetworkImageUi(image: controller.postCollection[index].mainPostImage),
-//           ),
-//         ],
-//       ),
-//     ),
-//   ),
-// );
