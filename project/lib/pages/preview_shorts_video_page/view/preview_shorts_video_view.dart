@@ -1,56 +1,136 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:auralive/ui/no_data_found_ui.dart';
-import 'package:auralive/pages/preview_shorts_video_page/controller/preview_shorts_video_controller.dart';
-import 'package:auralive/pages/preview_shorts_video_page/widget/preview_shorts_video_widget.dart';
-import 'package:auralive/shimmer/preview_shorts_video_shimmer_ui.dart';
-import 'package:auralive/utils/color.dart';
-import 'package:auralive/size_extension.dart';
-import 'package:preload_page_view/preload_page_view.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:auralive/routes/app_routes.dart';
+import 'package:auralive/utils/database.dart';
+import 'package:auralive/utils/utils.dart';
 
-class PreviewShortsVideoView extends GetView<PreviewShortsVideoController> {
-  const PreviewShortsVideoView({super.key});
+class PreviewShortsVideoViewIOS extends StatefulWidget {
+  const PreviewShortsVideoViewIOS({super.key});
+
+  @override
+  State<PreviewShortsVideoViewIOS> createState() => _PreviewShortsVideoViewIOSState();
+}
+
+class _PreviewShortsVideoViewIOSState extends State<PreviewShortsVideoViewIOS> {
+  WebViewController? webViewController;
+
+  @override
+  void initState() {
+    super.initState();
+    initializeWebView();
+  }
+
+  Future<void> initializeWebView() async {
+    try {
+      final storage = GetStorage();
+      final userEmail = storage.read('user_email') ?? '';
+      final webUserId = Database.loginUserId;
+      final webName = Database.fetchLoginUserProfileModel?.user?.name ?? '';
+
+      final url = "https://kulclass.com/live.php?email=$userEmail&uid=$webUserId&name=$webName";
+      Utils.showLog("🎯 Loading Shorts WebView (iOS): $url");
+
+      late final PlatformWebViewControllerCreationParams params;
+      if (WebViewPlatform.instance is WebKitWebViewPlatform) {
+        params = WebKitWebViewControllerCreationParams(
+          allowsInlineMediaPlayback: true,
+        );
+      } else {
+        params = const PlatformWebViewControllerCreationParams();
+      }
+
+      webViewController = WebViewController.fromPlatformCreationParams(params)
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(Colors.black)
+        ..setUserAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1")
+        ..addJavaScriptChannel(
+          'ToProfile',
+          onMessageReceived: (JavaScriptMessage message) {
+            if (message.message.isNotEmpty) {
+              Utils.showLog("Opening Profile for User ID: ${message.message}");
+              Get.toNamed(AppRoutes.previewUserProfilePage, arguments: message.message);
+            }
+          },
+        )
+        ..loadRequest(Uri.parse(url));
+
+      if (webViewController!.platform is AndroidWebViewController) {
+        final androidController = webViewController!.platform as AndroidWebViewController;
+        androidController.setMediaPlaybackRequiresUserGesture(false);
+
+        androidController.setOnShowFileSelector((FileSelectorParams params) async {
+          try {
+            final FileType type;
+            if (params.acceptTypes.any((t) => t.contains('video'))) {
+              type = FileType.video;
+            } else if (params.acceptTypes.any((t) => t.contains('image'))) {
+              type = FileType.image;
+            } else {
+              type = FileType.any;
+            }
+
+            final result = await FilePicker.platform.pickFiles(
+              type: type,
+              allowMultiple: params.mode == FileSelectorMode.openMultiple,
+            );
+
+            if (result != null && result.files.isNotEmpty) {
+              return result.files
+                  .where((file) => file.path != null)
+                  .map((file) => Uri.file(file.path!).toString())
+                  .toList();
+            }
+          } catch (e) {
+            Utils.showLog("File Picker Error: $e");
+          }
+          return [];
+        });
+      }
+    } catch (e) {
+      Utils.showLog("Shorts WebView Initialization Failed: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    Future.delayed(
-      Duration(milliseconds: 100),
-      () {
-        SystemChrome.setSystemUIOverlayStyle(
-          SystemUiOverlayStyle(
-            statusBarColor: AppColor.transparent,
-            statusBarIconBrightness: Brightness.light,
-          ),
-        );
-      },
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
     );
 
     return Scaffold(
-      body: GetBuilder<PreviewShortsVideoController>(
-        id: "onGetShorts",
-        builder: (controller) => controller.isLoading
-            ? PreviewShortsVideoShimmerUi()
-            : controller.mainShorts.isEmpty
-                ? NoDataFoundUi(iconSize: 140, fontSize: 16)
-                : PreloadPageView.builder(
-                    controller: controller.preloadPageController,
-                    itemCount: controller.mainShorts.length,
-                    preloadPagesCount: 4,
-                    scrollDirection: Axis.vertical,
-                    onPageChanged: (value) async {
-                      controller.onChangePage(value);
-                    },
-                    itemBuilder: (context, index) {
-                      return GetBuilder<PreviewShortsVideoController>(
-                        id: "onChangePage",
-                        builder: (controller) => PreviewShortsView(
-                          index: index,
-                          currentPageIndex: controller.currentPageIndex,
-                        ),
-                      );
-                    },
-                  ),
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          if (webViewController != null)
+            SizedBox.expand(
+              child: WebViewWidget(controller: webViewController!),
+            ),
+          Positioned(
+            top: 40,
+            left: 15,
+            child: GestureDetector(
+              onTap: () => Get.back(),
+              child: Container(
+                height: 40,
+                width: 40,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: 25),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
