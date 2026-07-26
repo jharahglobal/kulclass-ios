@@ -45,6 +45,8 @@ class Data {
   String? name;
   String? userName;
   String? userImage;
+  // ✅ ADDED THIS FIELD (Synced from Android)
+  String? userEmail; 
   bool? isVerified;
   bool? isLike;
   bool? isFollow;
@@ -71,6 +73,8 @@ class Data {
         this.name,
         this.userName,
         this.userImage,
+        // ✅ SYNCED
+        this.userEmail,
         this.isVerified,
         this.isLike,
         this.isFollow,
@@ -92,11 +96,15 @@ class Data {
     shareCount = json['shareCount'];
     isFake = json['isFake'];
     createdAt = json['createdAt'];
-    hashTag = json['hashTag'].cast<String>();
+    if (json['hashTag'] != null) {
+      hashTag = json['hashTag'].cast<String>();
+    }
     userId = json['userId'];
     name = json['name'];
     userName = json['userName'];
     userImage = json['userImage'];
+    // ✅ SYNCED
+    userEmail = json['userEmail']; 
     isVerified = json['isVerified'];
     isLike = json['isLike'];
     isFollow = json['isFollow'];
@@ -111,31 +119,33 @@ class Data {
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['_id'] = this.id;
-    data['caption'] = this.caption;
-    data['videoUrl'] = this.videoUrl;
-    data['videoImage'] = this.videoImage;
-    data['songId'] = this.songId;
-    data['shareCount'] = this.shareCount;
-    data['isFake'] = this.isFake;
-    data['createdAt'] = this.createdAt;
-    data['hashTag'] = this.hashTag;
-    data['userId'] = this.userId;
-    data['name'] = this.name;
-    data['userName'] = this.userName;
-    data['userImage'] = this.userImage;
-    data['isVerified'] = this.isVerified;
-    data['isLike'] = this.isLike;
-    data['isFollow'] = this.isFollow;
-    data['totalLikes'] = this.totalLikes;
-    data['totalComments'] = this.totalComments;
-    data['time'] = this.time;
-    data['isProfileImageBanned'] = this.isProfileImageBanned;
-    data['songTitle'] = this.songTitle;
-    data['songImage'] = this.songImage;
-    data['songLink'] = this.songLink;
-    data['singerName'] = this.singerName;
+    final Map<String, dynamic> data = <String, dynamic>{};
+    data['_id'] = id;
+    data['caption'] = caption;
+    data['videoUrl'] = videoUrl;
+    data['videoImage'] = videoImage;
+    data['songId'] = songId;
+    data['shareCount'] = shareCount;
+    data['isFake'] = isFake;
+    data['createdAt'] = createdAt;
+    data['hashTag'] = hashTag;
+    data['userId'] = userId;
+    data['name'] = name;
+    data['userName'] = userName;
+    data['userImage'] = userImage;
+    // ✅ SYNCED
+    data['userEmail'] = userEmail;
+    data['isVerified'] = isVerified;
+    data['isLike'] = isLike;
+    data['isFollow'] = isFollow;
+    data['totalLikes'] = totalLikes;
+    data['totalComments'] = totalComments;
+    data['time'] = time;
+    data['isProfileImageBanned'] = isProfileImageBanned;
+    data['songTitle'] = songTitle;
+    data['songImage'] = songImage;
+    data['songLink'] = songLink;
+    data['singerName'] = singerName;
     return data;
   }
 }
